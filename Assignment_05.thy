@@ -81,15 +81,14 @@ fun polyScale :: "int \<Rightarrow> int list \<Rightarrow> int list" where
 value "polyScale 3 [1,2,3]"
 
 (*foil polynomials*)
-(*DOESNT CURRENTLY WORK*)
 fun polyMult :: "int list \<Rightarrow> int list \<Rightarrow> int list" where
   "polyMult [] [] = []"
 | "polyMult xs [] = []"
 | "polyMult [] ys = []"
-| "polyMult (x # xs) ys = polyAdd (polyScale x ys)  (polyMult xs ys)"
+| "polyMult (x # xs) ys = polyAdd (polyScale x ys)  (0 #  polyMult xs ys)"
 
 value "polyMult [2,5][5,-8]"
-(*^ this should equal [10, -1, -24]*)
+(*^ this should equal [10, 9, -40]*)
 
 fun coeffs:: "exp \<Rightarrow> int list" where
   "coeffs Var  = [0,1]"
@@ -97,9 +96,72 @@ fun coeffs:: "exp \<Rightarrow> int list" where
 | "coeffs (Add e1 e2) = polyAdd (coeffs e1) (coeffs e2)"
 | "coeffs (Mult e1 e2) = polyMult (coeffs e1) (coeffs e2)"
 
+lemma polyAddDistribute [simp]: "evalp (polyAdd e1 e2) x = evalp e1 x + evalp e2 x"
+  apply (induction e1 rule: polyAdd.induct)
+  apply (auto)
+  apply (simp add: algebra_simps)
+  done
+
+lemma polyScaleDistribute [simp]: "evalp (polyScale xa va) x = xa * evalp va x " 
+  apply (induction arbitrary: x rule: polyScale.induct)
+   apply (auto simp add: algebra_simps)
+  done
+  
+
+lemma polyMultDistribute [simp]: "evalp (polyMult e1 e2) x = evalp e1 x * evalp e2 x"
+  apply (induction rule: polyMult.induct)
+  apply (auto)
+  apply (simp add: algebra_simps)
+  done
+
 lemma "evalp (coeffs e) x = eval e x"
-  apply (induction e arbitrary:x )
-    apply (auto)
+  apply (induction e rule: coeffs.induct)
+     apply (auto)
+  done
    
+(*exercise 3.1*)
+
+type_synonym vname = string
+datatype aexp = N int | V vname | Plus aexp aexp
+
+type_synonym val = int
+type_synonym state = "vname \<Rightarrow> val" 
+
+
+definition null_state ("<>") where
+  "null_state \<equiv>  \<lambda>x. 0"
+
+
+fun aval :: "aexp \<Rightarrow> state \<Rightarrow> val" where
+  "aval (N n) s = n" 
+| "aval (V x ) s = s x" 
+| "aval (Plus a1 a2) s = aval a1 s + aval a2 s"
+
+value "aval (Plus (N 3) (V '' x '')) (\<lambda>x . 0)"
+
+
+fun asimp_const :: "aexp \<Rightarrow> aexp" where
+  "asimp_const (N n) = N n" 
+| "asimp_const (V x) = V x"
+| "asimp_const  (Plus a1 a2) = (case (asimp_const a1, asimp_const a2) of (N n1, N n2) \<Rightarrow> N(n1 + n2)
+  | (b1, b2) \<Rightarrow> Plus b1 b2)"
+
+(*I couldn't figure out if there was a preexisting one. \<and> wasn't  working*)
+fun AND :: "bool => bool => bool" where
+  "AND True True = True"
+| "AND False _ = False"
+| "AND True False = False"
+
+
+fun optimal :: "aexp \<Rightarrow> bool" where
+  "optimal (N n) = True"
+| "optimal (V x) = True"
+| "optimal (Plus (N n1) (N n2)) = False"
+| "optimal (Plus a1 a2) = ((optimal a1) \<and> (optimal a2))"
+
+lemma "optimal (asimp_const a)"
+  apply (induction a)
+    apply (auto split: aexp.split)
+  done
 
 end
